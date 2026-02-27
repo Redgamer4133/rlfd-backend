@@ -1,29 +1,19 @@
-// backend/middleware/requireAdmin.js
+// middleware/requireAdmin.js
 import jwt from "jsonwebtoken";
-import { pool } from "../db.js";
+import dotenv from "dotenv";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+dotenv.config();
 
-export async function requireAdmin(req, res, next) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Missing token" });
+export default function requireAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: "No token provided" });
 
+  const token = authHeader.split(" ")[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const result = await pool.query(
-      "SELECT role FROM admin_users WHERE discord_id = $1",
-      [decoded.discordID]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: "Not authorized" });
-    }
-
-    req.adminID = decoded.discordID;
-    req.adminRole = result.rows[0].role;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     next();
   } catch (err) {
-    console.error("Auth error:", err);
-    return res.status(401).json({ error: "Invalid token" });
+    res.status(403).json({ error: "Invalid token" });
   }
 }
